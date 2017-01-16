@@ -14,19 +14,35 @@ unless node['x11vnc']['password'].empty?
     not_if { ::File.exist?(password_file) }
   end
 end
+if  'ubuntu' == node['platform']
+  if Chef::VersionConstraint.new('>= 15.04').include?(node['platform_version'])
+   service_provider = Chef::Provider::Service::Systemd
+  else Chef::VersionConstraint.new('>= 12.04').include?(node['platform_version'])
+   service_provider = Chef::Provider::Service::Upstart
+  end
+end
 
 case node['platform_family']
 when 'rhel'
   include_recipe 'yum-epel'
-  file_target = '/etc/init.d/x11vnc'
-  file_source = 'x11vnc.init.d.erb'
-  file_mode =  00755
+  file_target      = '/etc/init.d/x11vnc'
+  file_source      = 'x11vnc.init.d.erb'
+  file_mode        =  00755
   service_provider = Chef::Provider::Service::Init::Redhat
-else
-  file_target = '/etc/init/x11vnc.conf'
-  file_source = 'x11vnc.conf.erb'
-  file_mode =  00644
-  service_provider = Chef::Provider::Service::Upstart
+when 'debian'  
+  # use Systemd for more recent Ubuntu versions
+  if node['platform'] == 'ubuntu' && Chef::VersionConstraint.new('>= 15.04').include?(node['platform_version'])
+    file_target      = '/lib/systemd/system/x11vnc.service'
+    file_source      = 'x11vnc.service.erb'
+    file_mode        =  00644
+    service_provider = Chef::Provider::Service::Systemd
+  else
+    file_target      = '/etc/init/x11vnc.conf'
+    file_source      = 'x11vnc.conf.erb'
+    file_mode        =  00644
+    service_provider = Chef::Provider::Service::Upstart
+  end
+  
 end
 
 template file_target do
